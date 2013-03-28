@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bailouts: Desktop</title>
+</head>
+<body>
+
+<style>
+* {
+  margin: 0;
+  padding: 0; }
+.ad {
+  background-color: rgb(0,0,0);
+  position: relative;
+  max-width: 1100px;
+  min-width: 720px;
+  width: 1100px;
+  height: 480px; }
+.svg-wrapper {
+  margin: 0 auto;
+  position: relative;
+  width: 720px;
+  height: 480px; }
+</style>
+
+<script src="http://code.jquery.com/jquery-1.9.1.min.js" type="text/javascript"></script>
+<script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.4/underscore-min.js" type="text/javascript"></script>
+<script src="js/raphael.js" type="text/javascript"></script>
+<script src="js/purchases.js" type="text/javascript"></script>
+<script type="text/javascript">
+
+var BailoutsVisualization = function() {
+  var _this = this;
+
+  this.dates = [];
+  this.purchasesByDate = {};
+  this.purchasesByMonth = [];
+
+  this.prep = function() {
+    _this.paper = new Raphael( $('.svg-wrapper')[0], 720, 480 );
+    //_this.timeline = _this.paper.path( "M 0 430 L 720 430");
+    //_this.timeline.attr({
+    //  'stroke': 'rgb(255,255,255)',
+    //  'stroke-width': '2'
+    //});
+  }
+
+  this.sortByDate = function() {
+    for( var i = 0; i < window.purchases.length; i++ ) {
+      var purchase = purchases[i];
+      if( !_.contains( _this.dates, purchase['Date'] ) ) {
+        _this.dates.push( purchase['Date'] );
+        _this.purchasesByDate[ purchase['Date'] ] = [];
+      }
+      _this.purchasesByDate[ purchase['Date'] ].push( purchase );
+    }
+  }
+
+  this.sortByMonth = function() {
+    var rawDate, year, month, numberOfMonths, numberOfYears;
+    for( var i = 0; i < _this.dates.length; i++ ) {
+      rawDate = _this.purchasesByDate[_this.dates[i]][0]["Date"];
+      rawDate = new Date( rawDate );
+      year = rawDate.getFullYear();
+      month = rawDate.getMonth();
+      numberOfYears = year - _this.first.getFullYear() + 1;
+      numberOfMonths = numberOfYears * 12
+      numberOfMonths = numberOfMonths - _this.first.getMonth();
+      numberOfMonths = numberOfMonths - ( 12 - month );
+      while( _this.purchasesByMonth.length <= numberOfMonths ) {
+        _this.purchasesByMonth.push( [] );
+      }
+      _this.purchasesByMonth[numberOfMonths] = _this.purchasesByMonth[numberOfMonths].concat( _this.purchasesByDate[_this.dates[i]] );
+    }
+  }
+
+  this.plotDates = function() {
+    _this.dates = _this.dates.sort( function( a, b ) {
+      return Date.parse( a ) > Date.parse( b );
+    });
+    var first = new Date( _this.dates[0] );
+    var last = new Date( _this.dates[_this.dates.length - 1] );
+    var numberOfYears = last.getFullYear() - first.getFullYear() + 1;
+    _this.numberOfMonths = numberOfYears * 12;
+    _this.numberOfMonths = _this.numberOfMonths - first.getMonth();
+    _this.numberOfMonths = _this.numberOfMonths - ( 12 - last.getMonth() );
+    _this.dateOffset = 720 / _this.numberOfMonths;
+    _this.first = first;
+  }
+
+  this.prepDateSquares = function() {
+    var purchaseAmountsByMonth = [];
+    for( var i = 0; i < _this.purchasesByMonth.length; i++ ) {
+      purchaseAmountsByMonth.push( [] );
+      var purchasesThisMonth = 0;
+      for( var j = 0; j < _this.purchasesByMonth[i].length; j++ ) {
+        purchase = _this.purchasesByMonth[i][j];
+        purchasesThisMonth += purchase['Amount'];
+      }
+      purchaseAmountsByMonth[i] = purchasesThisMonth;
+    }
+    purchaseAmountsByMonth.sort();
+    _this.maxAmount = purchaseAmountsByMonth[purchaseAmountsByMonth.length - 1];
+  }
+
+  this.buildDateSquares = function() {
+    var x, y, h;
+    var w = _this.dateOffset - 5;
+    for( var i = 0; i < _this.purchasesByMonth.length; i++ ) {
+      var purchasesInMonth = _this.purchasesByMonth[i];
+      var heightToPoint = 0;
+      for( var j = 0; j < purchasesInMonth.length; j++ ) {
+        h = Math.floor( ( purchasesInMonth[j]['Amount'] * 380 ) / _this.maxAmount );
+        heightToPoint += h + 2;
+        x = i * _this.dateOffset + 3;
+        y = Math.abs( (heightToPoint ) - 430 );
+        var purchaseSquare = _this.paper.rect( x, y, w, h );
+        purchaseSquare.attr({
+          'fill': 'rgb(255,255,255)',
+          'stroke': 'none'
+        });
+        purchaseSquare.mouseover( _this.onPurchaseSquareMouseover );
+        purchaseSquare.mouseout( _this.onPurchaseSquareMouseout );
+      }
+    }
+  }
+
+  this.onPurchaseSquareMouseover = function() {
+    this.animate({
+      'fill': 'rgb(100,100,100)'
+    }, 100 );
+  },
+
+  this.onPurchaseSquareMouseout = function() {
+    this.animate({
+      'fill': 'rgb(255,255,255)'
+    }, 100 );
+  }
+
+  this.init = function() {
+    _this.prep();
+    _this.sortByDate();
+    _this.plotDates();
+    _this.sortByMonth();
+    _this.prepDateSquares();
+    _this.buildDateSquares();
+  } 
+}
+
+$(document).ready( function() {
+  var visualization = new BailoutsVisualization();
+  visualization.init();
+});
+
+</script>
+
+<div class="ad">
+  <div class="svg-wrapper"></div>
+</div>
+</body>
+</html>

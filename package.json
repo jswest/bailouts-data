@@ -1,0 +1,10 @@
+{
+  "name": "bailouts-data",
+  "description": "A data visualization of bailouts within a Quartz ENGAGE unit",
+  "version": "0.0.2",
+  "private": true,
+  "dependencies": {
+    "cheerio": "0.10.8",
+    "underscore": "1.4.4"
+  }
+}

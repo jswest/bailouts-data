@@ -2,9 +2,7 @@ var fs = require( 'fs' );
 
 var dataByType = {
   'types': [],
-  'topsheet': {}
-};
-var dates = {
+  'topsheet': {},
   'years': [],
   'yearsAndMonths': {}
 };
@@ -31,10 +29,11 @@ var callback = function( error, data ) {
       year = rawDate.getFullYear();
 
       // if we've never encountered this year before...
-      if( !dates['yearsAndMonths'][year] ) {
-        dates['yearsAndMonths'][year] = [];
+      if( !dataByType['yearsAndMonths'][year] ) {
+        dataByType['years'].push( year );
+        dataByType['yearsAndMonths'][year] = [];
         for( var j = 0; j < 12; j++ ) {
-          dates['yearsAndMonths'][year].push( [] );
+          dataByType['yearsAndMonths'][year].push( [] );
         }
       }
     }
@@ -70,8 +69,8 @@ var callback = function( error, data ) {
           'bigTotal': 0,
           'smallTotal': 0,
           'total': 0,
-          'big': dates['yearsAndMonths'],
-          'small': dates['yearsAndMonths']
+          'big': dataByType['yearsAndMonths'],
+          'small': dataByType['yearsAndMonths']
         }
         dataByType['types'].push( type );
         typeData = dataByType[type];

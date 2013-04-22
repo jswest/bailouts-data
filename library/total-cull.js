@@ -1,11 +1,13 @@
 var fs = require( 'fs' );
 
-var dataByType = {
+var sortedData = {
   'types': [],
   'topsheet': {},
   'years': [],
   'yearsAndMonths': {}
 };
+
+var dataByDate = {};
 
 var callback = function( error, data ) {
   if( !error ) {
@@ -13,9 +15,6 @@ var callback = function( error, data ) {
     // prepare to iterate over the jsonified data.
     var jsonifiedData = JSON.parse( data );
     var len = jsonifiedData.length;
-    var wrong = 0;
-    var right = 0;
-    var biggest = 0;
     var item; // general variables
     var type, bigEnough, typeData; // type variables
     var rawDate, year, month; // date variables
@@ -27,23 +26,29 @@ var callback = function( error, data ) {
       // determine the date, but only care about month and year
       rawDate = new Date( item['Date'] );
       year = rawDate.getFullYear();
+      month = rawDate.getMonth();
 
       // if we've never encountered this year before...
-      if( !dataByType['yearsAndMonths'][year] ) {
-        dataByType['years'].push( year );
-        dataByType['yearsAndMonths'][year] = [];
+      if( !sortedData['yearsAndMonths'][year] ) {
+        sortedData['years'].push( year );
+        sortedData['yearsAndMonths'][year] = [];
+        dataByDate[year] = [];
         for( var j = 0; j < 12; j++ ) {
-          dataByType['yearsAndMonths'][year].push( [] );
+          sortedData['yearsAndMonths'][year].push( [] );
+          dataByDate[year].push( [] );
         }
       }
+
+      // now, push the data into the dataByDate variable
+      dataByDate[year][month].push( item );
     }
 
 
     // iterate for realz!
+    var j, k, pYear;
     for( var i = 0; i < len; i++ ) {
       item = jsonifiedData[i];
       type = item['Type'];
-      typeData = dataByType[type];
 
       // determine the date, but only care about month and year.
       rawDate = new Date( item['Date'] );
@@ -53,28 +58,37 @@ var callback = function( error, data ) {
       // Determine if the amount is 'big enough'
       if( item['Amount'] >= 500000000 ) {
         bigEnough = true;
-        if( item['Amount'] > biggest ) {
-          biggest = item['Amount'];
-        }
       } else {
         bigEnough = false;
       }
 
       // if we've never encountered this Type before...
-      if( !typeData ) {
-        dataByType[type] = {
+      if( !sortedData[type] ) {
+        sortedData[type] = {
           'numberOfItems': 0,
           'numberOfBigItems': 0,
           'numberOfSmallItems': 0,
           'bigTotal': 0,
           'smallTotal': 0,
           'total': 0,
-          'big': dataByType['yearsAndMonths'],
-          'small': dataByType['yearsAndMonths']
+          'big': {},
+          'small': {}
         }
-        dataByType['types'].push( type );
-        typeData = dataByType[type];
+        for( j = 0; j < sortedData['years'].length; j++ ) {
+          pYear = sortedData['years'][j];
+          sortedData[type]['big'][pYear] = [];
+          for( k = 0; k < 12; k++ ) {
+            sortedData[type]['big'][pYear].push( [] );
+          }
+          sortedData[type]['small'][pYear] = [];
+          for( k = 0; k < 12; k++ ) {
+            sortedData[type]['small'][pYear].push( [] );
+          }
+        }
+        sortedData['types'].push( type );
       }
+
+      typeData = sortedData[type];
 
       // now that we've made sure the item's Type has an entry...
       typeData['numberOfItems'] += 1; // incriment the total number of items for the given type
@@ -93,16 +107,62 @@ var callback = function( error, data ) {
         typeData['numberOfSmallItems'] += 1; // incriment the number of small items
       }
     }
+    
+    // great. now find the "whitespace" months from the top and bottom
+    // also find the biggest month
+    var firstYear = sortedData['years'][0]; // top
+    var lastYear = sortedData['years'][sortedData['years'].length - 1]; // bottom
+    var firstMonth, lastMonth;
+
+    // iterate over the first year...
+    var month;
+    for( var i = 0; i < dataByDate[firstYear].length; i++ ) {
+      month = dataByDate[firstYear][i];
+      if( month.length > 0 ) {
+        firstMonth = i;
+        break;
+      }
+    }
+
+    // iterate over the last year...
+    var month;
+    for( var i = dataByDate[lastYear].length - 1; i >= 0; i-- ) {
+      month = dataByDate[lastYear][i];
+      if( month.length > 0 ) {
+        lastMonth = i;
+        break;
+      }
+    }
+
+    // find the biggest month
+    var year, month, amountInMonth;
+    var j, k;
+    var amountOfBiggestMonth = 0;
+    for( var i = 0; i < sortedData['years'].length; i++ ) {
+      year = sortedData['years'][i];
+      for( j = 0; j < 12; j++ ) {
+        month = dataByDate[year][j];
+        amountInMonth = 0;
+        for( k = 0; k < month.length; k++ ) {
+          amountInMonth += month[k]['Amount'];
+        }
+        if( amountInMonth > amountOfBiggestMonth ) {
+          amountOfBiggestMonth = amountInMonth;
+        }
+      }
+    }
 
     // create the topsheet info
     var type, typeData;
-    for( var i = 0; i < dataByType['types'].length; i++ ) {
-      type = dataByType['types'][i];
-      typeData = dataByType[type];
-      dataByType['topsheet']['meta'] = {
-        'biggest': biggest
+    for( var i = 0; i < sortedData['types'].length; i++ ) {
+      type = sortedData['types'][i];
+      typeData = sortedData[type];
+      sortedData['topsheet']['meta'] = {
+        'amountOfBiggestMonth': amountOfBiggestMonth,
+        'numberOfYears': sortedData['years'].length,
+        'numberOfMonths': sortedData['years'].length * 12
       };
-      dataByType['topsheet'][type] = {
+      sortedData['topsheet'][type] = {
         'numberOfItems': typeData['numberOfItems'],
         'numberOfBigItems': typeData['numberOfBigItems'],
         'numberOfSmallItems': typeData['numberOfSmallItems'],
@@ -115,7 +175,7 @@ var callback = function( error, data ) {
     // write the file
     fs.writeFile(
       'data/full-sorted.js',
-      JSON.stringify( dataByType, null, 2 ),
+      JSON.stringify( sortedData, null, 2 ),
       function( error ) {
         if( error ) { console.log( error ); }
         else { console.log( 'written!' ); }

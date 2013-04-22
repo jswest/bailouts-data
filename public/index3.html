@@ -20,28 +20,247 @@ header#primary-header {
   font-family: "Helvetica Neue", "Helvetica", "Arial", sans-serif;
   padding: 0 0 0 10px;
   position: absolute;
-  text-align: left;
+  width: 100%;
   height: 50px;
   z-index: 2; }
-header#primary-header h1 { font-size: 50px; }
-#svg-wrapper { 
+header#primary-header h1 {
+  font-size: 50px;
+  padding-left: 50px;
+  text-align: left;
+  height: 50px; }
+header#primary-header h2 {
+  font-family: "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+  font-size: 25px;
+  padding-left: 50px;
+  text-align: left;
+  height: 25px;
+}
+#svg-wrapper {
+  margin: 0 auto;
   position: relative;
-  width: 100%;
-  height: 100%;
+  width: 720px;
+  height: 100%; }
+canvas#faux-svg {
+  margin-left: -360px;
+  position: absolute;
+  top: 0;
+  left: 50%;
 }
 </style>
+<script src="http://code.jquery.com/jquery-1.9.1.min.js" type="text/javascript"></script>
 <script src="js/data.js" type="text/javascript"></script>
+<script src="js/raphael.js" type="text/javascript"></script>
 <script type="text/javascript">
+( function() {
+
+var Visualizer = function() {
+  var that = this;
+  
+  this.init = function() {
+    that.paper = new Raphael( $('#svg-wrapper')[0], 720, 480 );
+    that.maxHeight = 400;
+    that.monthInterval = 720 / VZ.Data['topsheet']['meta']['numberOfMonths'];
+    that.widthOfMonth = that.monthInterval - 2;
+  }
+
+  this.getHeight = function( amount ) {
+    return ( that.maxHeight * amount ) / VZ.Data['topsheet']['meta']['amountOfBiggestMonth'];
+  }
+  this.prettifyAmount = function( amount ) {
+    return '$' + amount / 1000000000 + ' billion'
+  }
+
+  this.paintMonth = function( monthData, monthCounter, xOffset, color1, color2 ) {
+    var x, y, w, h;
+    var r, rn;
+    var heightThusFar = 0;
+    for( var k = 0; k < monthData.length; k++ ) {
+      h = that.getHeight( monthData[k]['Amount'] );
+      x = (monthCounter * that.monthInterval) + xOffset;
+      y = Math.abs( heightThusFar - 420 ) - h;
+      w = (that.widthOfMonth);
+      heightThusFar += h + 1;
+      r = that.paper.rect( x, y, w, h ).attr({
+        'fill': color1,
+        'stroke': 'none'
+      });
+      rn = $(r[0]);
+      rn.data({
+        'amount': that.prettifyAmount( monthData[k]['Amount'] ),
+        'entity': monthData[k]['Entity']
+      });
+      rn.on( 'mouseover', function() {
+        $(this).attr({
+          'fill': color2
+        });
+        console.log( $(this).data('amount') );
+        console.log( $(this).data('entity') );
+      });
+      rn.on( 'mouseout', function() {
+        $(this).attr({
+          'fill': color1
+        });
+      });
+
+    }
+  }
+
+  this.paintAway = function( type, color1, color2 ) {
+    var years = VZ.Data['years'];
+    var year, j, k, monthData;
+    var monthCounter = 0;
+    for( var i = 0; i < years.length; i++ ) {
+      year = years[i];
+      for( j = 0; j < VZ.Data[type]['big'][year].length; j++ ) {
+        monthData = VZ.Data[type]['big'][year][j];
+        that.paintMonth( monthData, monthCounter, 0, color1, color2 );
+        monthCounter++;
+      }
+    }
+  }
+
+  this.paintAllData = function() {
+    var years = VZ.Data['years'];
+    var year, j, k, monthData, type;
+    var monthCounter = 0;
+    for( var i = 0; i < years.length; i++ ) {
+      year = years[i];
+      for( j = 0; j < 12; j++ ) {
+        monthData = [];
+        for( k = 0; k < VZ.Data['types'].length; k++ ) {
+          type = VZ.Data['types'][k];
+          monthData = monthData.concat( VZ.Data[type]['big'][year][j] );
+        }
+        that.paintMonth( monthData, monthCounter, 0, 'rgb(0,0,0)', 'rgb(100,100,100)' );
+        monthCounter++;
+      }
+    }
+  }
+
+}
+
+var TopsheetVisualizer = function() {
+  var that = this;
+
+  this.colors = {
+    "Purchase": [255, 0, 0],
+    "Loan": [225, 0, 0],
+    "Dividend": [0, 0, 225],
+    "Subsidy": [195,0,0],
+    "Refund": [0, 0, 255],
+    "Warrant": [0, 0, 195],
+    "Interest": [0, 0, 165],
+    "Proceeds": [0, 0, 105],
+    "Distribution": [0, 0, 135],
+    "": [0,0,55],
+    "Revenue": [0,0,25]
+  }
+
+  this.init = function() {
+    that.paper = new Raphael( $('#svg-wrapper')[0], 720, 480 );
+    that.maxWidth = 700;
+    that.maxHeight = 400;
+  }
+
+  this.getWidth = function( amount ) {
+    return (that.maxWidth * amount) / 1140119250287
+  }
+
+  that.paintData = function() {
+    that.paintRect( 0, 0 );
+  }
+
+  that.paintRect = function( i, widthThusFar ) {
+    var type = VZ.Data['types'][i];
+    var item = VZ.Data['topsheet'][type];
+    var c = this.colors[type];
+    var x, y, w, h;
+    x = widthThusFar;
+    y = 190;
+    w = that.getWidth( item['total'] );
+    h = 100;
+    var r = that.paper.rect( x, y, w, h );
+    var rn = $(r.node);
+    r.attr({
+      'stroke': 'none',
+      'fill': 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] +')'
+    });
+    rn.data({
+      'type': type
+    });
+    rn.on( 'mouseover', function() {
+      console.log( rn.data( 'type' ) );
+      r.attr({
+        'fill': 'rgb(' + c[0] + ',' + 100 + ',' + c[2] + ')'
+      });
+    });
+    rn.on( 'mouseout', function() {
+      r.attr({
+        'fill': 'rgb(' + c[0] + ',0,' + c[2] + ')'
+      });
+    });
+    rn.on( 'click', function() {
+      $(that.paper.canvas).hide();
+      var c1 = 'rgb(' + c[0] + ',0,' + c[2] + ')';
+      var c2 = 'rgb(' + c[0] + ',100,' + c[2] + ')';
+      VZ.Viz.paintAway( type, c1, c2 ); 
+    })
+
+    if( i < VZ.Data['types'].length - 1 ) {
+      var t = setTimeout( function() {
+        that.paintRect( i + 1, widthThusFar + w + 2 );
+      }, 100 );
+    }
+  }
+}
+
+var Choices = function() {
+  var that = this;
+
+  this.init = function() {
+    var c, c1, c2;
+    for( var i = 0; i < VZ.Data['types'].length; i++ ) {
+      var type = VZ.Data['types'][i];
+      c = VZ.TViz.colors[type];
+      c1 = 'rgb(' + c[0] + ',0,' + c[2] + ')';
+      c2 = 'rgb(' + c[0] + ',100,' + c[2] + ')';
+      $('nav#choices').append(
+        '<button data-type="' + type + '" data-c1="' + c1 + '" data-c2="' + c2 + '">' + type + '</button>'
+      );
+      $('button').on( 'click', function() {
+        var t = $(this);
+        VZ.Viz.paper.clear();
+        VZ.Viz.paintAway( t.data('type'), t.data('c1'), t.data('c2') );
+        $('#primary-header').find('h2').html( t.data('type') );
+      });
+    }
+  }
+
+}
 
 
+$(document).ready( function() {
+  VZ.Viz = new Visualizer;
+  VZ.Viz.init();
+  VZ.TViz = new TopsheetVisualizer;
+  VZ.TViz.init();
+  //VZ.Viz.paintAllData();
+  VZ.TViz.paintData();
+  VZ.Choices = new Choices;
+  VZ.Choices.init();
+});
+
+} )();
 </script>
 
 <div id="ad">
   <header id="primary-header">
     <h1>Bailouts</h1>
+    <h2></h2>
   </header>
   <div id="svg-wrapper">
   </div>
+  <nav id="choices"></nav>
 </div>
 
 </body>
